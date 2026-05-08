@@ -212,10 +212,17 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--cinza);mi
           <option value="m365_upgrade">M365 · Upgrade de plano</option>
           <option value="azure">Azure · Novo projeto</option>
           <option value="rede_camara">Serviço · Rede e Câmeras</option>
+          <option value="migracao_email">Serviço · Migração de E-mail</option>
           <option value="treinamento">Serviço · Treinamento</option>
+          <option value="avulso">Serviço Avulso</option>
           <option value="produto">Produto Físico</option>
           <option value="software">Software / Licença</option>
         </select>
+      </div>
+      <div class="campo" id="campo-avulso" style="display:none;">
+        <label>Valor da comissão avulsa (R$) <span class="req">*</span></label>
+        <input type="number" id="valor_avulso" min="0" step="0.01" placeholder="Ex: 50,00" oninput="calcular()">
+        <span class="hint">Informe o valor combinado da comissão para este serviço avulso</span>
       </div>
       <div class="campo" id="campo-nivel" style="display:none;">
         <label>Nível de complexidade <span class="req">*</span></label>
@@ -249,20 +256,21 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--cinza);mi
     <div class="grid-3">
       <div class="campo">
         <label>Comercial responsável <span class="req">*</span></label>
-        <select id="comercial">
+        <select id="comercial" onchange="calcular()">
           <option value="">— selecione —</option>
-          <option>Comercial 1</option>
-          <option>Comercial 2</option>
-          <option>Comercial 3</option>
+          <option value="Idalmo">Idalmo</option>
+          <option value="Francisco">Francisco</option>
+          <option value="Luis">Luis</option>
         </select>
       </div>
       <div class="campo">
         <label>Técnico responsável</label>
-        <select id="tecnico">
+        <select id="tecnico" onchange="calcular()">
           <option value="">— nenhum / a definir —</option>
-          <option>Técnico 1</option>
-          <option>Técnico 2</option>
-          <option>Técnico 3</option>
+          <option value="Irenilson">Irenilson</option>
+          <option value="Thiago">Thiago</option>
+          <option value="Vanderson">Vanderson</option>
+          <option value="Outro">Outro</option>
         </select>
       </div>
       <div class="campo">
@@ -501,14 +509,16 @@ document.getElementById('modal-bg').addEventListener('click', e => {
 
 // ── TIPOS E CÁLCULOS ──────────────────────────────────────────────────────
 const TIPOS = {
-  suporte:      { label:'Suporte Recorrente',  pctCom:0.50, baseCom:'bruto', pctTec:0.50, baseTec:'bruto', nivel:false },
-  m365_novo:    { label:'M365 · Novo',         pctCom:0.50, baseCom:'liq',   pctTec:0.10, baseTec:'bruto', nivel:false },
-  m365_upgrade: { label:'M365 · Upgrade',      pctCom:0.50, baseCom:'liq',   pctTec:0.10, baseTec:'bruto', nivel:false },
-  azure:        { label:'Azure',               pctCom:0.50, baseCom:'liq',   pctTec:0.00, baseTec:'',      nivel:false },
-  rede_camara:  { label:'Rede / Câmeras',      pctCom:0.05, baseCom:'bruto', pctTec:null, baseTec:'bruto', nivel:true  },
-  treinamento:  { label:'Treinamento',         pctCom:0.05, baseCom:'bruto', pctTec:0.05, baseTec:'bruto', nivel:false },
-  produto:      { label:'Produto Físico',      pctCom:0.05, baseCom:'liq',   pctTec:0.00, baseTec:'',      nivel:false },
-  software:     { label:'Software / Licença',  pctCom:0.05, baseCom:'liq',   pctTec:0.00, baseTec:'',      nivel:false },
+  suporte:        { label:'Suporte Recorrente',      pctCom:0.50, baseCom:'bruto', pctTec:0.50, baseTec:'bruto', nivel:false, avulso:false },
+  m365_novo:      { label:'M365 · Novo',             pctCom:0.50, baseCom:'liq',   pctTec:0.10, baseTec:'bruto', nivel:false, avulso:false },
+  m365_upgrade:   { label:'M365 · Upgrade',          pctCom:0.50, baseCom:'liq',   pctTec:0.10, baseTec:'bruto', nivel:false, avulso:false },
+  azure:          { label:'Azure',                   pctCom:0.50, baseCom:'liq',   pctTec:0.00, baseTec:'',      nivel:false, avulso:false },
+  rede_camara:    { label:'Rede / Câmeras',          pctCom:0.05, baseCom:'bruto', pctTec:null, baseTec:'bruto', nivel:true,  avulso:false },
+  migracao_email: { label:'Migração de E-mail',      pctCom:0.05, baseCom:'bruto', pctTec:0.10, baseTec:'bruto', nivel:false, avulso:false },
+  treinamento:    { label:'Treinamento',             pctCom:0.05, baseCom:'bruto', pctTec:0.05, baseTec:'bruto', nivel:false, avulso:false },
+  avulso:         { label:'Serviço Avulso',          pctCom:null, baseCom:'',      pctTec:null, baseTec:'',      nivel:false, avulso:true  },
+  produto:        { label:'Produto Físico',          pctCom:0.05, baseCom:'liq',   pctTec:0.00, baseTec:'',      nivel:false, avulso:false },
+  software:       { label:'Software / Licença',      pctCom:0.05, baseCom:'liq',   pctTec:0.00, baseTec:'',      nivel:false, avulso:false },
 };
 
 function brl(v){ return 'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
@@ -528,6 +538,7 @@ function atualizarCampos(){
   const t = document.getElementById('tipo').value;
   const info = TIPOS[t];
   document.getElementById('campo-nivel').style.display = info && info.nivel ? 'flex' : 'none';
+  document.getElementById('campo-avulso').style.display = info && info.avulso ? 'flex' : 'none';
   calcular();
 }
 
@@ -543,9 +554,30 @@ function calcular(){
   const vl = parseFloat(document.getElementById('vliq').value)||0;
   const idalmo = document.getElementById('idalmo').value === 'sim';
   const nivelVal = parseFloat(document.getElementById('nivel') ? document.getElementById('nivel').value : 0)||0;
-  if(!t || vb === 0){ document.getElementById('calc-box').style.display='none'; return null; }
+  const valAvulso = parseFloat(document.getElementById('valor_avulso') ? document.getElementById('valor_avulso').value : 0)||0;
+
+  if(!t){ document.getElementById('calc-box').style.display='none'; return null; }
+
   const info = TIPOS[t];
   const fator = idalmo ? 0.5 : 1;
+
+  // Serviço Avulso — valor de comissão informado diretamente
+  if(info.avulso){
+    if(valAvulso === 0){ document.getElementById('calc-box').style.display='none'; return null; }
+    const valCom = valAvulso * fator;
+    document.getElementById('r-pct-com').textContent = '—';
+    document.getElementById('r-val-com').textContent = brl(valCom);
+    document.getElementById('r-pct-tec').textContent = '—';
+    document.getElementById('r-val-tec').textContent = 'N/A';
+    document.getElementById('r-total').textContent = brl(valCom);
+    document.getElementById('banner-val-com').textContent = brl(valCom);
+    document.getElementById('banner-msg').textContent = `Comissão avulsa informada${idalmo ? ' (Idalmo envolvido — pool ÷2)' : ''}`;
+    document.getElementById('r-obs-calc').textContent = idalmo ? '⚠ Pool reduzido 50% (Idalmo entrou).' : '';
+    document.getElementById('calc-box').style.display = 'block';
+    return { valCom, valTec: 0, pctCom: 0, pctTec: 0 };
+  }
+
+  if(vb === 0){ document.getElementById('calc-box').style.display='none'; return null; }
   const baseCom = info.baseCom === 'liq' ? vl : vb;
   const valCom = baseCom * info.pctCom * fator;
   let pctTec = info.nivel ? nivelVal : info.pctTec;
@@ -600,11 +632,16 @@ async function enviar(){
     else el.style.borderColor='';
   });
   if(!ok){ alert('Preencha os campos obrigatórios marcados com *.'); return; }
+
+  const tipoKey = document.getElementById('tipo').value;
+  const isAvulso = TIPOS[tipoKey]?.avulso;
   const vb = parseFloat(document.getElementById('vbruto').value)||0;
-  if(vb===0){ alert('Informe o valor bruto.'); return; }
+  const valAvulso = parseFloat(document.getElementById('valor_avulso')?.value)||0;
+
+  if(!isAvulso && vb===0){ alert('Informe o valor bruto.'); return; }
+  if(isAvulso && valAvulso===0){ alert('Informe o valor da comissão avulsa.'); return; }
 
   const res = calcular();
-  const tipoKey = document.getElementById('tipo').value;
   const nivelEl = document.getElementById('nivel');
 
   const registro = {
@@ -612,9 +649,9 @@ async function enviar(){
     data:          document.getElementById('data').value,
     cliente:       document.getElementById('cliente').value,
     tipo:          TIPOS[tipoKey].label,
-    nivel:         nivelEl ? (nivelEl.options[nivelEl.selectedIndex]?.text || '—') : '—',
-    valor_bruto:   vb,
-    valor_liquido: parseFloat(document.getElementById('vliq').value)||0,
+    nivel:         isAvulso ? `Avulso: R$ ${valAvulso}` : (nivelEl ? (nivelEl.options[nivelEl.selectedIndex]?.text || '—') : '—'),
+    valor_bruto:   isAvulso ? valAvulso : vb,
+    valor_liquido: isAvulso ? valAvulso : (parseFloat(document.getElementById('vliq').value)||0),
     comercial:     document.getElementById('comercial').value,
     tecnico:       document.getElementById('tecnico').value || '—',
     idalmo:        document.getElementById('idalmo').value === 'sim' ? 'Sim' : 'Não',
@@ -680,6 +717,7 @@ function limpar(){
   ['data','cliente','vbruto','vliq','nf','obs'].forEach(id=>{ document.getElementById(id).value=''; });
   ['tipo','comercial','tecnico'].forEach(id=>{ document.getElementById(id).value=''; });
   if(document.getElementById('nivel')) document.getElementById('nivel').value='';
+  if(document.getElementById('valor_avulso')) document.getElementById('valor_avulso').value='';
   document.getElementById('idalmo').value='nao';
   document.getElementById('mes').value='';
   document.getElementById('calc-box').style.display='none';
